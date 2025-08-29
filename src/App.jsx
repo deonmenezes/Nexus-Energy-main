@@ -11,13 +11,12 @@ import Contact from './components/Contact'
 import ScrollToTop from './components/ScrollToTop'
 import Chatbot from './components/Chatbot'
 import WhatsAppButton from './components/WhatsAppButton'
+import Interactive3DBackground from './components/Interactive3DBackground'
 
 import VisionMission from './pages/VisionMission'
 import Technology from './pages/Technology'
 import Applications from './pages/Applications'
-import ShoeNike from './components/Shoe.jsx'
-import BackgroundCanvas from './components/Shoe.jsx'
-
+import HyperspeedBackground from './components/HyperspeedBackground'
 const App = () => {
   return (
     <>
@@ -28,10 +27,11 @@ const App = () => {
           <Routes>
             <Route path="/" element={
               <>
-            
-                <Hero />
+                <Interactive3DBackground />
+                
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '100px' }}>
-                  <BackgroundCanvas />
+              
+
                 </div>
                 <About />
                 <VisionMission />

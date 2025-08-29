@@ -1,327 +1,676 @@
-﻿import React, { useEffect, useRef } from "react";
-import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+﻿import React, { useRef, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+    Glasses,
+    CheckCircle2,
+    ArrowRight,
+    Eye,
+    Smartphone,
+    Zap,
+    Shield,
+    Gamepad2,
+    Layers3,
+    TrendingUp,
+    Clock,
+    Headphones,
+    Camera
+} from 'lucide-react';
 
-const BackgroundCanvas = () => {
-  const canvasRef = useRef(null);
-  const threeContainerRef = useRef(null);
+// Interactive 3D Background Component
+const Interactive3DBackground = () => {
+  const mountRef = useRef(null);
+  const sceneRef = useRef(null);
+  const rendererRef = useRef(null);
+  const cameraRef = useRef(null);
+  const modelRef = useRef(null);
+  const animationIdRef = useRef(null);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up THREE.js renderer for shark
-    const threeContainer = threeContainerRef.current;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    if (!mountRef.current) return;
 
-    // Create THREE.js scene
+    // Scene setup
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1000);
-    camera.position.z = 8;
+    scene.background = new THREE.Color(0x0a0a0a);
+    sceneRef.current = scene;
 
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
+    // Camera setup
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      mountRef.current.clientWidth / mountRef.current.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, 15);
+    cameraRef.current = camera;
+
+    // Renderer setup
+    const renderer = new THREE.WebGLRenderer({ 
       antialias: true,
+      alpha: true 
     });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0); // Transparent background
-    renderer.setPixelRatio(window.devicePixelRatio); // Improve rendering quality
-    threeContainer.appendChild(renderer.domElement);
+    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    rendererRef.current = renderer;
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;
     scene.add(directionalLight);
 
-    // Add blue-tinted rim light
-    const rimLight = new THREE.DirectionalLight(0x6080ff, 0.8);
-    rimLight.position.set(-2, 1, -1);
-    scene.add(rimLight);
+    const pointLight = new THREE.PointLight(0x8b5cf6, 1.0, 20);
+    pointLight.position.set(0, 0, 10);
+    scene.add(pointLight);
 
-    // Create a shark object as a placeholder before the model loads
-    const sharkBox = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 0.5, 2),
-      new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true })
-    );
-    scene.add(sharkBox);
-
-    // Updated camera position to see the scene properly
-    camera.position.set(10, 45, 160);
-    camera.lookAt(0, 0, 0);
-    
-    // Shark movement variables - with increased distance and speed
-    const sharkData = {
-      object: sharkBox,
-      speed: 0.3, // Increased speed for longer movement
-      direction: 1, // 1 for right, -1 for left
-      bounds: { min: -25, max: 25 }, // Expanded bounds for longer movement distance
-    };
-
-    // Load shark model
+    // Load GLTF Model
     const loader = new GLTFLoader();
     loader.load(
-      "/ImageToStl.com_Liquid_cooled_115V230Ah_asm.glb", // Replace with your actual shark GLB path
+      '/models/scene.gltf',
       (gltf) => {
-        console.log("Shark model loaded successfully");
-
-        // Remove placeholder
-        scene.remove(sharkBox);
-
-        // Add the real shark
-        const shark = gltf.scene;
-        shark.scale.set(0.1, 0.1, 0.1);
-        shark.position.set(0, 0, 0); // Start far left with expanded bounds
-        shark.rotation.y = Math.PI / 2; // Rotate to face right direction
-        scene.add(shark);
-
-        // Update the shark reference
-        sharkData.object = shark;
-
-        // Setup animations if they exist
-        if (gltf.animations && gltf.animations.length > 0) {
-          const mixer = new THREE.AnimationMixer(shark);
-          const action = mixer.clipAction(gltf.animations[0]);
-          action.play();
-          sharkData.mixer = mixer;
-          console.log("Shark animation started");
-        } else {
-          console.log("No animations found in the shark model");
-        }
+        const model = gltf.scene;
+        
+        // Scale and position the model
+        model.scale.set(5, 5, 5);
+        model.position.set(0, 0, 0);
+        
+        // Enable shadows for all meshes
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        
+        scene.add(model);
+        modelRef.current = model;
+        setIsLoading(false);
       },
-      (xhr) => {
-        console.log(`${((xhr.loaded / xhr.total) * 100).toFixed(2)}% loaded`);
+      (progress) => {
+        console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
       },
       (error) => {
-        console.error("Error loading shark model:", error);
+        console.error('Error loading model:', error);
+        setIsLoading(false);
       }
     );
 
-    // 2D Canvas setup (your original code)
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      // Also update Three.js renderer
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+    // Mouse interaction
+    const handleMouseMove = (event) => {
+      mouseRef.current.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouseRef.current.y = -(event.clientY / window.innerHeight) * 2 + 1;
     };
 
-    resizeCanvas();
+    window.addEventListener('mousemove', handleMouseMove);
 
-    // Set up particles for network visualization with improved colors
-    const particles = [];
-    const particleCount = 180; // Increased from 100 to 180
-    const connectionDistance = 150;
+    mountRef.current.appendChild(renderer.domElement);
 
-    // Yellow light particles (small amount)
-    const yellowLights = [];
-    const yellowLightCount = 12; // Small amount of yellow lights
+    // Animation loop
+    const animate = () => {
+      animationIdRef.current = requestAnimationFrame(animate);
 
-    // Create yellow light particles
-    for (let i = 0; i < yellowLightCount; i++) {
-      yellowLights.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 3 + 2, // Slightly larger
-        speedX: (Math.random() - 0.5) * 1.5,
-        speedY: (Math.random() - 0.5) * 1.5,
-        // Yellow colors with varying opacity
-        color: `rgba(255, ${Math.random() * 50 + 200}, 0, ${
-          Math.random() * 0.3 + 0.4
-        })`,
-      });
-    }
+      const time = Date.now() * 0.001;
+      const mouse = mouseRef.current;
 
-    // Create particles with more vibrant colors and increased speed
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 2 + 1,
-        // Increased speed range by multiplying by 2
-        speedX: (Math.random() - 0.5) * 2,
-        speedY: (Math.random() - 0.5) * 2,
-        color: `rgba(${Math.random() * 100 + 155}, ${
-          Math.random() * 50 + 50
-        }, 255, ${Math.random() * 0.5 + 0.3})`,
-      });
-    }
-
-    // Animation function for 2D canvas
-    function animate2D() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Update and draw blue particles
-      for (let i = 0; i < particles.length; i++) {
-        let p = particles[i];
-
-        // Update position
-        p.x += p.speedX;
-        p.y += p.speedY;
-
-        // Bounce off edges
-        if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
-
-        // Draw particle
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-
-        // Connect particles with more vibrant connections
-        for (let j = i + 1; j < particles.length; j++) {
-          let p2 = particles[j];
-          let distance = Math.sqrt(
-            Math.pow(p.x - p2.x, 2) + Math.pow(p.y - p2.y, 2)
-          );
-
-          if (distance < connectionDistance) {
-            ctx.beginPath();
-            // Brighter connections
-            ctx.strokeStyle = `rgba(120, 180, 255, ${
-              (1 - distance / connectionDistance) * 0.5
-            })`;
-            ctx.lineWidth = 1;
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-          }
-        }
+      if (modelRef.current) {
+        const model = modelRef.current;
+        
+        // Gentle auto-rotation
+        model.rotation.y += 0.005;
+        
+        // Mouse interaction - subtle movement
+        const targetX = mouse.x * 2;
+        const targetY = mouse.y * 1;
+        
+        model.position.x += (targetX - model.position.x) * 0.02;
+        model.position.y += (targetY - model.position.y) * 0.02;
+        
+        // Gentle floating motion
+        model.position.y += Math.sin(time * 2) * 0.01;
       }
 
-      // Draw and update yellow lights
-      for (let i = 0; i < yellowLights.length; i++) {
-        let light = yellowLights[i];
+      // Move camera slightly based on mouse
+      camera.position.x = mouse.x * 3;
+      camera.position.y = mouse.y * 2;
+      camera.lookAt(0, 0, 0);
 
-        // Update position
-        light.x += light.speedX;
-        light.y += light.speedY;
-
-        // Bounce off edges
-        if (light.x < 0 || light.x > canvas.width) light.speedX *= -1;
-        if (light.y < 0 || light.y > canvas.height) light.speedY *= -1;
-
-        // Draw yellow light with glow effect
-        ctx.beginPath();
-
-        // Create gradient for glow effect
-        const gradient = ctx.createRadialGradient(
-          light.x,
-          light.y,
-          0,
-          light.x,
-          light.y,
-          light.size * 3
-        );
-        gradient.addColorStop(0, light.color);
-        gradient.addColorStop(1, "rgba(255, 255, 0, 0)");
-
-        ctx.fillStyle = gradient;
-        ctx.arc(light.x, light.y, light.size * 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw core of light
-        ctx.beginPath();
-        ctx.arc(light.x, light.y, light.size, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255, 255, 150, 0.8)";
-        ctx.fill();
-      }
-
-      requestAnimationFrame(animate2D);
-    }
-
-    // Modified Animation function for Three.js shark
-    function animate3D() {
-      requestAnimationFrame(animate3D);
-
-      // Move the shark if it exists
-      if (sharkData.object) {
-        // Update animation mixer if it exists
-        if (sharkData.mixer) {
-          sharkData.mixer.update(0.016);
-        }
-
-        // Calculate new position
-        const newX =
-          sharkData.object.position.x + sharkData.speed * sharkData.direction;
-
-        // Check boundaries and change direction instead of resetting position
-        if (newX > sharkData.bounds.max) {
-          // Change direction to left
-          sharkData.direction = -1;
-          // Flip the shark model to face left
-          sharkData.object.rotation.y = -Math.PI / 2;
-        } else if (newX < sharkData.bounds.min) {
-          // Change direction to right
-          sharkData.direction = 1;
-          // Flip the shark model to face right
-          sharkData.object.rotation.y = Math.PI / 2;
-        }
-
-        // Update position
-        sharkData.object.position.x = newX;
-
-        // Debug log every 3 seconds
-        // if (Math.floor(Date.now() / 1000) % 3 === 0) {
-        //   console.log("Shark position:", sharkData.object.position.x, "Direction:", sharkData.direction);
-        // }
-      }
+      // Animate point light based on mouse
+      pointLight.position.x = mouse.x * 15;
+      pointLight.position.y = mouse.y * 10;
 
       renderer.render(scene, camera);
-    }
+    };
 
-    // Start both animations
-    animate2D();
-    animate3D();
+    animate();
 
-    // Handle window resize
-    window.addEventListener("resize", resizeCanvas);
+    // Handle resize
+    const handleResize = () => {
+      if (!mountRef.current || !camera || !renderer) return;
+      
+      camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener("resize", resizeCanvas);
-      if (threeContainer.contains(renderer.domElement)) {
-        threeContainer.removeChild(renderer.domElement);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
       }
+      if (mountRef.current && renderer.domElement) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', handleResize);
+      renderer.dispose();
     };
   }, []);
 
   return (
-    <>
-      <div
-        ref={threeContainerRef}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
+    <div className="fixed inset-0 w-full h-full z-0">
+      <div 
+        ref={mountRef} 
+        className="w-full h-full"
+        style={{ touchAction: 'none' }}
       />
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          zIndex: 5,
-          opacity: 0.5,
-        }}
-      />
-    </>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="text-white text-lg">Loading 3D Model...</div>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-pink-600/5" />
+    </div>
   );
 };
 
-export default BackgroundCanvas;
+const ThreeDDevelopmentService = () => {
+    // Scroll to top on mount
+    useEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, []);
+    const features = [
+        {
+            icon: Eye,
+            title: "3D Modeling & Design",
+            description: "High-quality 3D models and designs for various applications and industries."
+        },
+        {
+            icon: Smartphone,
+            title: "Cross-Platform Support",
+            description: "Compatible with major platforms and devices for maximum reach and accessibility."
+        },
+        {
+            icon: Layers3,
+            title: "Advanced Rendering",
+            description: "High-fidelity rendering with realistic lighting, materials, and textures."
+        },
+        {
+            icon: Gamepad2,
+            title: "Interactive Elements",
+            description: "Engaging interactive 3D elements and animations for immersive experiences."
+        },
+        {
+            icon: Camera,
+            title: "3D Visualization",
+            description: "Stunning 3D visualizations for product showcases and architectural designs."
+        },
+        {
+            icon: Headphones,
+            title: "Spatial Audio",
+            description: "3D spatial audio integration for enhanced immersive experiences."
+        }
+    ];
+
+    const applications = [
+        {
+            title: "Product Visualization",
+            description: "Create detailed 3D models and visualizations for product marketing and design.",
+            examples: ["Product renders", "3D prototypes", "Virtual showrooms", "Interactive demos"]
+        },
+        {
+            title: "Architectural Visualization",
+            description: "3D architectural models and walkthroughs for real estate and construction.",
+            examples: ["Building models", "Interior design", "Virtual tours", "Construction planning"]
+        },
+        {
+            title: "Gaming & Entertainment",
+            description: "3D assets and environments for games, VR experiences, and entertainment.",
+            examples: ["Game assets", "VR environments", "3D animations", "Character models"]
+        },
+        {
+            title: "Medical & Scientific",
+            description: "3D models for medical visualization, training, and scientific research.",
+            examples: ["Medical models", "Training simulations", "Research visualization", "Educational content"]
+        }
+    ];
+
+    const technologies = [
+        { name: "Blender", description: "Open-source 3D modeling and animation software" },
+        { name: "Maya", description: "Professional 3D animation and modeling software" },
+        { name: "3ds Max", description: "3D modeling, animation, and rendering software" },
+        { name: "Unity 3D", description: "Game engine for 3D development and real-time rendering" },
+        { name: "Unreal Engine", description: "Advanced 3D engine for high-fidelity graphics" },
+        { name: "Cinema 4D", description: "3D modeling, animation, and motion graphics software" },
+        { name: "Houdini", description: "Procedural 3D modeling and visual effects software" },
+        { name: "ZBrush", description: "Digital sculpting and 3D modeling software" }
+    ];
+
+    const processSteps = [
+        {
+            step: "01",
+            title: "Concept & Planning",
+            description: "Define project requirements, create concept sketches, and plan the 3D development approach.",
+            duration: "1-2 weeks"
+        },
+        {
+            step: "02",
+            title: "3D Modeling",
+            description: "Create detailed 3D models with proper topology, UV mapping, and texture preparation.",
+            duration: "3-5 weeks"
+        },
+        {
+            step: "03",
+            title: "Texturing & Materials",
+            description: "Apply realistic textures, materials, and lighting to achieve desired visual quality.",
+            duration: "2-3 weeks"
+        },
+        {
+            step: "04",
+            title: "Rendering & Animation",
+            description: "Set up rendering parameters, create animations, and produce final outputs.",
+            duration: "2-4 weeks"
+        },
+        {
+            step: "05",
+            title: "Integration & Testing",
+            description: "Integrate 3D content into target platforms and conduct thorough testing.",
+            duration: "1-2 weeks"
+        }
+    ];
+
+    const packages = [
+        {
+            name: "Basic 3D Model",
+            price: "$2,000",
+            description: "Perfect for simple 3D modeling needs",
+            features: [
+                "Single 3D model",
+                "Basic texturing",
+                "Standard rendering",
+                "2 revision rounds",
+                "Source files",
+                "3 months support"
+            ],
+            highlighted: false
+        },
+        {
+            name: "Professional 3D Package",
+            price: "$8,000",
+            description: "Complete 3D development solution for businesses",
+            features: [
+                "Multiple 3D models",
+                "Advanced texturing",
+                "High-quality rendering",
+                "Animation sequences",
+                "Interactive elements",
+                "6 months support",
+                "Platform integration"
+            ],
+            highlighted: true
+        },
+        {
+            name: "Enterprise 3D Solution",
+            price: "Custom",
+            description: "Comprehensive 3D development for large organizations",
+            features: [
+                "Custom 3D solution",
+                "Advanced animations",
+                "Real-time rendering",
+                "VR/AR integration",
+                "12 months support",
+                "Dedicated project manager",
+                "Training & documentation",
+                "API development"
+            ],
+            highlighted: false
+        }
+    ];
+
+    const portfolio = [
+        {
+            title: "Product 3D Visualization",
+            description: "High-quality 3D product renders for e-commerce and marketing campaigns",
+            image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=800",
+            tech: ["Blender", "Substance Painter", "Cycles Renderer"]
+        },
+        {
+            title: "Architectural 3D Model",
+            description: "Detailed architectural visualization with realistic lighting and materials",
+            image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=800",
+            tech: ["3ds Max", "V-Ray", "AutoCAD Integration"]
+        },
+        {
+            title: "Game 3D Assets",
+            description: "Optimized 3D models and environments for gaming and VR applications",
+            image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=800",
+            tech: ["Maya", "Unity 3D", "ZBrush"]
+        }
+    ];
+
+    return (
+        <div className="min-h-screen bg-background relative">
+            {/* Navbar */}
+            <Navbar 
+                title="3D Development Services - Virelity.com"
+                description="Professional 3D modeling, visualization, and interactive 3D development services. Create stunning 3D content for your business."
+            />
+            
+            {/* 3D Background */}
+            <Interactive3DBackground />
+            
+            {/* Content Overlay */}
+            <div className="relative z-10">
+                {/* Hero Section */}
+                <section className="pt-32 pb-20 bg-gradient-to-br from-purple-600/10 to-pink-600/10 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+                    <div className="container relative z-10">
+                        <div className="max-w-4xl mx-auto text-center">
+                            <motion.div
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8 }}
+                            >
+                                <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-full px-6 py-3 mb-8">
+                                    <Glasses className="w-6 h-6 text-purple-400" />
+                                    <span className="text-purple-400 font-semibold">3D Development</span>
+                                </div>
+
+                                <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-foreground via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                                    Bring Your Ideas to Life in 3D
+                                </h1>
+
+                                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed">
+                                    Create stunning 3D models, visualizations, and interactive experiences that captivate your audience and bring your concepts to life with cutting-edge 3D development technology.
+                                </p>
+
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                    <button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105">
+                                        Start Your 3D Project
+                                    </button>
+                                    <button className="border border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white px-8 py-4 rounded-lg font-semibold transition-colors duration-300">
+                                        View 3D Portfolio
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Features Section */}
+                <section className="py-20">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Our 3D Development?</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                We create high-quality 3D content that delivers exceptional visual experiences and drives engagement.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {features.map((feature, index) => {
+                                const IconComponent = feature.icon;
+                                return (
+                                    <motion.div
+                                        key={feature.title}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                                        viewport={{ once: true }}
+                                        className="bg-card border border-border rounded-xl p-6 hover:border-purple-400/30 hover:shadow-lg transition-all duration-300"
+                                    >
+                                        <div className="bg-gradient-to-r from-purple-600/10 to-pink-600/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                                            <IconComponent className="w-6 h-6 text-purple-400" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                                        <p className="text-muted-foreground">{feature.description}</p>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Applications Section */}
+                <section className="py-20 bg-muted/30">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">3D Development Applications</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                Discover how our 3D development services can transform your business and create immersive experiences.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {applications.map((app, index) => (
+                                <motion.div
+                                    key={app.title}
+                                    initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    viewport={{ once: true }}
+                                    className="bg-card border border-border rounded-xl p-8 hover:border-purple-400/30 hover:shadow-lg transition-all duration-300"
+                                >
+                                    <h3 className="text-2xl font-semibold mb-4 text-purple-400">{app.title}</h3>
+                                    <p className="text-muted-foreground mb-6">{app.description}</p>
+                                    <ul className="space-y-2">
+                                        {app.examples.map((example, idx) => (
+                                            <li key={idx} className="flex items-center space-x-3">
+                                                <CheckCircle2 className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                                                <span className="text-sm">{example}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Technologies Section */}
+                <section className="py-20">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">3D Development Technologies</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                We use industry-leading 3D software and tools to create exceptional 3D content.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {technologies.map((tech, index) => (
+                                <motion.div
+                                    key={tech.name}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    whileInView={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    viewport={{ once: true }}
+                                    className="bg-card border border-border rounded-lg p-6 text-center hover:border-purple-400/30 hover:shadow-lg transition-all duration-300"
+                                >
+                                    <h3 className="text-lg font-semibold mb-2 text-purple-400">{tech.name}</h3>
+                                    <p className="text-sm text-muted-foreground">{tech.description}</p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Process Section */}
+                <section className="py-20 bg-muted/30">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">Our 3D Development Process</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                We follow a systematic approach to create high-quality 3D content that meets your requirements.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                            {processSteps.map((step, index) => (
+                                <motion.div
+                                    key={step.step}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    viewport={{ once: true }}
+                                    className="relative"
+                                >
+                                    <div className="bg-card border border-border rounded-xl p-6 hover:border-purple-400/30 hover:shadow-lg transition-all duration-300 h-full">
+                                        <div className="text-3xl font-bold text-purple-400 mb-3">{step.step}</div>
+                                        <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+                                        <p className="text-muted-foreground mb-4">{step.description}</p>
+                                        <div className="flex items-center text-sm text-purple-400">
+                                            <Clock className="w-4 h-4 mr-2" />
+                                            {step.duration}
+                                        </div>
+                                    </div>
+                                    {index < processSteps.length - 1 && (
+                                        <div className="hidden lg:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                                            <ArrowRight className="w-8 h-8 text-purple-400/30" />
+                                        </div>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Pricing Section */}
+                <section className="py-20">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">3D Development Packages</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                Choose the perfect package for your 3D development needs and bring your ideas to life.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                            {packages.map((pkg, index) => (
+                                <motion.div
+                                    key={pkg.name}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    viewport={{ once: true }}
+                                    className={`bg-card border rounded-xl p-8 hover:shadow-lg transition-all duration-300 ${pkg.highlighted ? 'border-purple-400 shadow-lg scale-105' : 'border-border'
+                                        }`}
+                                >
+                                    {pkg.highlighted && (
+                                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-semibold px-3 py-1 rounded-full inline-block mb-4">
+                                            Most Popular
+                                        </div>
+                                    )}
+                                    <h3 className="text-2xl font-bold mb-2">{pkg.name}</h3>
+                                    <div className="text-3xl font-bold text-purple-400 mb-2">{pkg.price}</div>
+                                    <p className="text-muted-foreground mb-6">{pkg.description}</p>
+
+                                    <ul className="space-y-3 mb-8">
+                                        {pkg.features.map((feature, idx) => (
+                                            <li key={idx} className="flex items-start space-x-3">
+                                                <CheckCircle2 className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                                                <span className="text-sm">{feature}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    <button className={`w-full px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${pkg.highlighted
+                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                                            : 'border border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white'
+                                        }`}>
+                                        Get Started
+                                    </button>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Portfolio Section */}
+                <section className="py-20 bg-muted/30">
+                    <div className="container">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-4">3D Projects We've Created</h2>
+                            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                                Explore our portfolio of successful 3D development projects across different industries.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            {portfolio.map((project, index) => (
+                                <motion.div
+                                    key={project.title}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    whileInView={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    viewport={{ once: true }}
+                                    className="group relative overflow-hidden rounded-xl bg-card border border-border hover:border-purple-400/30 hover:shadow-lg transition-all duration-300"
+                                >
+                                    <div className="aspect-video overflow-hidden">
+                                        <img
+                                            src={project.image}
+                                            alt={project.title}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                        />
+                                    </div>
+                                    <div className="p-6">
+                                        <h3 className="text-xl font-semibold mb-2">{project.title}</h3>
+                                        <p className="text-muted-foreground mb-4">{project.description}</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {project.tech.map((tech) => (
+                                                <span key={tech} className="bg-purple-400/10 text-purple-400 text-xs px-2 py-1 rounded-full">
+                                                    {tech}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* CTA Section */}
+                <section className="py-20 bg-gradient-to-r from-purple-600/10 to-pink-600/10">
+                    <div className="container">
+                        <div className="text-center max-w-3xl mx-auto">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-6">
+                                Ready to Create in 3D?
+                            </h2>
+                            <p className="text-xl text-muted-foreground mb-8">
+                                Let's discuss how our 3D development expertise can transform your ideas into stunning visual experiences.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105">
+                                    Schedule 3D Consultation
+                                </button>
+                                <button className="border border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white px-8 py-4 rounded-lg font-semibold transition-colors duration-300">
+                                    View More Projects
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    );
+};
+
+export default ThreeDDevelopmentService;
